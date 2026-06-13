@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LGU Laoag - Engineering DTR Terminal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.6.0/dist/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        #reader { width: 100%; max-width: 420px; margin: 0 auto; border: 2px dashed #6c757d; border-radius: 8px; padding: 10px; background: #fafafa; }
+        .sticky-top { top: 0; z-index: 1020; }
+        .table-responsive { max-height: 520px; overflow-y: auto; }
+        .nav-tabs .nav-link { font-weight: bold; color: #495057; }
+        .nav-tabs .nav-link.active { color: #0d6efd !important; background-color: #fff; border-bottom-color: transparent; }
+        #custom-alert-banner { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: none; min-width: 320px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+    </style>
+</head>
+<body class="bg-light">
+
+    <div class="container-fluid py-4 px-4">
+        <header class="text-center mb-4 bg-white p-3 rounded shadow-sm border">
+            <h2 class="fw-bold text-primary mb-1">LGU LAOAG — OFFICE OF CITY ENGINEERING</h2>
+            <h1 class="h5 text-dark fw-bold mb-2">DTR Kiosk Terminal & History Hub</h1>
+            <h2 id="live-clock" class="fw-bold text-danger display-6 my-1">00:00:00 AM</h2>
+            
+            <ul class="nav nav-tabs justify-content-center mt-3" id="kioskWorkspaceTabs" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link active" id="terminal-tab" data-bs-toggle="tab" data-bs-target="#live-terminal" type="button" onclick="displayTodayLogs()">🕒 Attendance Kiosk Terminal</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#personal-history" type="button" onclick="displayArchiveLogs()">📁 Personal DTR Archives (Read-Only)</button>
+                </li>
+            </ul>
+            <div class="mt-2 small">
+                <a href="adminlogin.html" class="text-secondary fw-bold text-decoration-none">⚙️ Restricted Administration Board Access →</a>
+            </div>
+        </header>
+
+        <div class="tab-content" id="kioskWorkspaceTabsContent">
+            <!-- VIEW TAB 1: REAL-TIME KIOSK -->
+            <div class="tab-pane fade show active" id="live-terminal" role="tabpanel">
+                <div class="row g-4">
+                    <div class="col-md-5">
+                        <div class="card shadow-sm border-0 mb-4">
+                            <div class="card-header bg-dark text-white text-center fw-bold">📸 Scan QR Code ID Card</div>
+                            <div class="card-body text-center">
+                                <div id="reader"></div>
+                            </div>
+                        </div>
+
+                        <div class="card shadow-sm border-0">
+                            <div class="card-header bg-primary text-white text-center fw-bold">⌨️ Manual Keypad ID Registry</div>
+                            <div class="card-body">
+                                <form id="dtr-form">
+                                    <div class="mb-3">
+                                        <label for="userId" class="form-label fw-bold">Personnel ID Number</label>
+                                        <input type="text" class="form-control form-control-lg text-center fw-bold text-primary" id="userId" placeholder="e.g., 23-140010" required>
+                                    </div>
+                                    <div class="row mb-3">
+                                        <div class="col-6">
+                                            <label for="workMode" class="form-label small fw-bold">Duty Mode</label>
+                                            <select class="form-select text-center" id="workMode">
+                                                <option value="RTO" selected>RTO (Office)</option>
+                                                <option value="WFH">WFH (Home)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-6">
+                                            <label for="forceType" class="form-label small fw-bold">Shift Block Target</label>
+                                            <select class="form-select text-danger text-center fw-bold" id="forceType">
+                                                <option value="AUTO" selected>🔄 Auto-Detect</option>
+                                                <option value="AM_IN">☀️ AM In</option>
+                                                <option value="AM_OUT">☀️ AM Out</option>
+                                                <option value="PM_IN">🌙 PM In</option>
+                                                <option value="PM_OUT">🌙 PM Out</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="d-grid">
+                                        <button type="submit" class="btn btn-primary btn-lg fw-bold py-2">Register Time Stamp</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-7">
+                        <div class="card shadow-sm border-0 h-100">
+                            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                                <span class="fw-bold">📊 Real-Time Logs Feed (Today)</span>
+                                <span class="badge bg-primary fw-bold" id="today-count-badge">0 Rows</span>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-striped mb-0 align-middle text-center">
+                                        <thead class="table-secondary sticky-top">
+                                            <tr>
+                                                <th>Timestamp</th><th>ID Number</th><th>Personnel Name</th><th>Action</th><th>Mode</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="today-table-body"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW TAB 2: READ-ONLY PERSONAL HISTORY SEARCH HUB -->
+            <div class="tab-pane fade" id="personal-history" role="tabpanel">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3">
+                        <span class="fw-bold">📁 Personal Document Lookup & Exporter Deck</span>
+                        <span class="badge bg-success fw-bold text-uppercase">Read-Only Mode Secured</span>
+                    </div>
+                    
+                    <div class="card-body bg-white border-bottom p-3">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold text-muted">Enter Personnel ID Number</label>
+                                <input type="text" class="form-control text-center fw-bold text-primary" id="archiveSearchId" placeholder="Input ID" oninput="displayArchiveLogs()">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small fw-bold text-muted">Year Target</label>
+                                <select class="form-select text-center fw-bold" id="archiveYear" onchange="displayArchiveLogs()">
+                                    <option value="2026" selected>2026</option><option value="2027">2027</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-bold text-muted">Month Target</label>
+                                <select class="form-select text-center fw-bold" id="archiveMonth" onchange="displayArchiveLogs()">
+                                    <option value="01">January</option><option value="02">February</option>
+                                    <option value="03">March</option><option value="04">April</option>
+                                    <option value="05">May</option><option value="06" selected>June</option>
+                                    <option value="07">July</option><option value="08">August</option>
+                                    <option value="09">September</option><option value="10">October</option>
+                                    <option value="11">November</option><option value="12">December</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end gap-2">
+                                <button type="button" class="btn btn-outline-success w-50 fw-bold py-2" onclick="exportToExcel()">📊 Export Excel</button>
+                                <button type="button" class="btn btn-danger w-50 fw-bold py-2" onclick="compileReport()">🖨️ Export PDF</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped align-middle mb-0 text-center">
+                                <thead class="table-dark sticky-top">
+                                    <tr>
+                                        <th>Log Date Reference</th><th>Timestamp</th><th>Personnel ID</th><th>Name on Record</th><th>Attendance Block</th><th>Duty Mode</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="archive-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="custom-alert-banner" class="alert text-white fw-bold p-3 rounded text-center"><span id="custom-alert-text">Notification</span></div>
+
+    <script>
+        // --- Clock setup ---
+        setInterval(() => {
+            document.getElementById('live-clock').innerText = new Date().toLocaleTimeString();
+        }, 1000);
+
+        // --- Core Time Stamp Registration Processor ---
+        function runDtrLogEngine(userId, forcedAction = "AUTO", workMode = "RTO") {
+            userId = userId.trim().toUpperCase();
+            if(!userId) return;
+
+            const users = JSON.parse(localStorage.getItem('DTR_USERS')) || [];
+            const targetedProfile = users.find(u => u.userId === userId);
+
+            if (!targetedProfile) {
+                showNativeToast("❌ Access Denied: Unregistered Profile ID. Contact Admin.", "bg-danger text-white");
+                return;
+            }
+
+            let logs = JSON.parse(localStorage.getItem('DTR_LOGS')) || [];
+            const now = new Date();
+            const dateString = now.toISOString().split('T')[0];
+            const timeString = now.toTimeString().split(' ')[0];
+            
+            const logsToday = logs.filter(r => r.userId === userId && r.date === dateString);
+            
+            let detectedType = forcedAction;
+            if (forcedAction === "AUTO") {
+                if (logsToday.length === 0) detectedType = "AM_IN";
+                else if (logsToday.length === 1) detectedType = "AM_OUT";
+                else if (logsToday.length === 2) detectedType = "PM_IN";
+                else if (logsToday.length === 3) detectedType = "PM_OUT";
+                else {
+                    showNativeToast("Shift entries completely satisfied for today.", "bg-warning text-dark");
+                    return;
+                }
+            }
+
+            logs.push({
+                id: Date.now() + Math.floor(Math.random() * 1000),
+                userId: userId,
+                userName: targetedProfile.userName,
+                date: dateString,
+                time: timeString,
+                type: detectedType,
+                mode: workMode
+            });
+
+            localStorage.setItem('DTR_LOGS', JSON.stringify(logs));
+            showNativeToast(`Timestamp Registered: ${detectedType}`, "bg-success text-white");
+            displayTodayLogs();
+        }
+
+        document.getElementById('dtr-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            runDtrLogEngine(document.getElementById('userId').value, document.getElementById('forceType').value, document.getElementById('workMode').value);
+            document.getElementById('userId').value = "";
+        });
+
+        function displayTodayLogs() {
+            const tbody = document.getElementById('today-table-body');
+            const logs = JSON.parse(localStorage.getItem('DTR_LOGS')) || [];
+            const todayStr = new Date().toISOString().split('T')[0];
+            const logsToday = logs.filter(log => log.date === todayStr);
+
+            document.getElementById('today-count-badge').innerText = `${logsToday.length} Entries`;
+            tbody.innerHTML = '';
+
+            logsToday.sort((a,b) => b.id - a.id).forEach(log => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${log.time}</strong></td><td><code>${log.userId}</code></td>
+                    <td class="text-start">${log.userName}</td>
+                    <td><span class="badge ${log.type.startsWith('AM') ? 'bg-warning text-dark' : 'bg-dark'}">${log.type}</span></td>
+                    <td><span class="badge bg-light text-dark border">${log.mode}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+            if (logsToday.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">Awaiting real-time logs feed interactions...</td></tr>`;
+            }
+        }
+
+        function displayArchiveLogs() {
+            const tbody = document.getElementById('archive-table-body');
+            const filterId = document.getElementById('archiveSearchId').value.trim().toUpperCase();
+            const yearTarget = document.getElementById('archiveYear').value;
+            const monthTarget = document.getElementById('archiveMonth').value;
+            
+            if(!tbody) return;
+            tbody.innerHTML = '';
+
+            // Query your backend database server engine instead of referencing local storage
+            fetch(`http://localhost:3000/api/logs?userId=${filterId}&year=${yearTarget}&month=${monthTarget}`)
+            .then(res => res.json())
+            .then(targetLogs => {
+                // Cache data context on user's local instance temporarily for your Excel/PDF functions to reference
+                window.currentQueriedLogs = targetLogs;
+
+                targetLogs.forEach(log => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${log.date}</strong></td><td><code>${log.time}</code></td>
+                        <td><span class="badge bg-secondary">${log.userId}</span></td>
+                        <td class="text-start">${log.userName}</td><td><span class="badge bg-dark">${log.type}</span></td>
+                        <td><span class="badge bg-light text-dark border">${log.mode}</span></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                if (targetLogs.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No historical records found inside the database server mapping for this scope query.</td></tr>`;
+                }
+            })
+            .catch(() => {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">Error connecting to the DTR database server.</td></tr>`;
+            });
+        }
+
+        function compileCalculatedMatrix(userLogs, year, month) {
+            const daysCount = new Date(year, month, 0).getDate();
+            const monthlyMatrix = {};
+            for (let i = 1; i <= daysCount; i++) {
+                monthlyMatrix[i] = { amIn: "", amOut: "", pmIn: "", pmOut: "", mode: "" };
+            }
+            userLogs.forEach(log => {
+                const dateParts = log.date.split('-');
+                if(dateParts.length < 3) return;
+                if (dateParts[0] == year && parseInt(dateParts[1]) == parseInt(month)) {
+                    const dayNum = parseInt(dateParts[2]);
+                    if (dayNum >= 1 && dayNum <= daysCount) {
+                        if (log.type === "AM_IN") monthlyMatrix[dayNum].amIn = log.time;
+                        if (log.type === "AM_OUT") monthlyMatrix[dayNum].amOut = log.time;
+                        if (log.type === "PM_IN") monthlyMatrix[dayNum].pmIn = log.time;
+                        if (log.type === "PM_OUT") monthlyMatrix[dayNum].pmOut = log.time;
+                        if (log.mode) monthlyMatrix[dayNum].mode = log.mode;
+                    }
+                }
+            });
+            return { monthlyMatrix, daysCount };
+        }
+
+        function exportToExcel() {
+            const idTarget = document.getElementById('archiveSearchId').value.trim().toUpperCase();
+            const yearTarget = document.getElementById('archiveYear').value;
+            const monthTarget = document.getElementById('archiveMonth').value;
+            const monthLabel = document.getElementById('archiveMonth').options[document.getElementById('archiveMonth').selectedIndex].text;
+
+            if(!idTarget) { alert("Please supply a targeted Employee ID number."); return; }
+            const logs = JSON.parse(localStorage.getItem('DTR_LOGS')) || [];
+            const userLogs = logs.filter(log => log.userId.toUpperCase() === idTarget);
+            let fullName = userLogs.length > 0 ? userLogs[0].userName : "Personnel Staff Member";
+
+            const { monthlyMatrix, daysCount } = compileCalculatedMatrix(userLogs, yearTarget, monthTarget);
+            const excelRows = [
+                ["LGU LAOAG — OFFICE OF CITY ENGINEERING"],
+                [`DAILY TIME RECORD ARCHIVE REPORT — ${monthLabel.toUpperCase()} ${yearTarget}`],
+                [`Employee: ${fullName} (${idTarget})`], [],
+                ["Calendar Day", "AM Clock In", "AM Clock Out", "PM Clock In", "PM Clock Out", "Duty Mode Reference"]
+            ];
+            for (let d = 1; d <= daysCount; d++) {
+                excelRows.push([String(d).padStart(2,'0'), monthlyMatrix[d].amIn||'--', monthlyMatrix[d].amOut||'--', monthlyMatrix[d].pmIn||'--', monthlyMatrix[d].pmOut||'--', monthlyMatrix[d].mode||'--']);
+            }
+            const worksheet = XLSX.utils.aoa_to_sheet(excelRows);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "DTR Archive");
+            XLSX.writeFile(workbook, `DTR_EXPORT_${idTarget}_${monthLabel}.xlsx`);
+        }
+
+        function compileReport() {
+            const idTarget = document.getElementById('archiveSearchId').value.trim().toUpperCase();
+            const yearTarget = document.getElementById('archiveYear').value;
+            const monthTarget = document.getElementById('archiveMonth').value;
+            const monthLabel = document.getElementById('archiveMonth').options[document.getElementById('archiveMonth').selectedIndex].text;
+
+            if(!idTarget) { alert("Please supply a valid lookup ID."); return; }
+            const logs = JSON.parse(localStorage.getItem('DTR_LOGS')) || [];
+            const userLogs = logs.filter(log => log.userId.toUpperCase() === idTarget);
+            let fullName = userLogs.length > 0 ? userLogs[0].userName : "Personnel Staff Member";
+            
+            const { monthlyMatrix, daysCount } = compileCalculatedMatrix(userLogs, yearTarget, monthTarget);
+            const { jsPDF } = window.jspdf; 
+            let doc = new jsPDF('portrait');
+            
+            doc.setFont("Helvetica", "bold"); doc.setFontSize(12);
+            doc.text("LGU LAOAG - OFFICE OF CITY ENGINEERING", 14, 14);
+            doc.setFont("Helvetica", "normal"); doc.setFontSize(10);
+            doc.text("DAILY TIME RECORD (DTR) — " + monthLabel + " " + yearTarget, 14, 20);
+            doc.text("Employee: " + fullName + " (" + idTarget + ")", 14, 25);
+            
+            const tableRows = [];
+            for (let d = 1; d <= daysCount; d++) {
+                tableRows.push([String(d).padStart(2,'0'), monthlyMatrix[d].amIn||'--', monthlyMatrix[d].amOut||'--', monthlyMatrix[d].pmIn||'--', monthlyMatrix[d].pmOut||'--', monthlyMatrix[d].mode||'--']);
+            }
+
+            doc.autoTable({ 
+                startY: 30, head: [['Day', 'AM In', 'AM Out', 'PM In', 'PM Out', 'Mode']], body: tableRows, theme: 'grid',
+                styles: { fontSize: 9, cellPadding: 2, alignment: 'center' }, headStyles: { fillColor: [33, 37, 41] }
+            });
+
+            let finalY = doc.lastAutoTable.finalY + 25; 
+            const pageHeight = doc.internal.pageSize.height;
+
+            if (finalY + 35 > pageHeight) {
+                doc.addPage();
+                finalY = 25;
+            }
+
+            doc.setFontSize(10);
+            doc.setFont("Helvetica", "normal");
+            doc.text("I certify on my honor that the above is a true", 14, finalY);
+            doc.text("and correct report of hours rendered.", 14, finalY + 5);
+            
+            doc.line(14, finalY + 20, 90, finalY + 20); 
+            doc.setFont("Helvetica", "bold");
+            doc.text(fullName.toUpperCase(), 14, finalY + 25);
+            doc.setFont("Helvetica", "italic"); doc.setFontSize(9);
+            doc.text("Employee Signature", 14, finalY + 29);
+
+            doc.setFontSize(10); doc.setFont("Helvetica", "normal");
+            doc.text("Verified and Approved by:", 120, finalY);
+            
+            doc.line(120, finalY + 20, 196, finalY + 20); 
+            doc.setFont("Helvetica", "bold");
+            doc.text("ENGR. GULLIER VERDADERO", 120, finalY + 25);
+            doc.setFont("Helvetica", "normal"); doc.setFontSize(9);
+            doc.text("Head of the Office of the City Engineer", 120, finalY + 29);
+            doc.setFont("Helvetica", "italic");
+            doc.text("Supervisor", 120, finalY + 33);
+            
+            doc.save("DTR_ARCHIVE_" + idTarget + "_" + monthLabel + ".pdf");
+        }
+
+        function onScanSuccess(decodedText) { if (decodedText) { runDtrLogEngine(decodedText, "AUTO", "RTO"); } }
+        const html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+        html5QrcodeScanner.render(onScanSuccess);
+
+        function showNativeToast(msg, colorClass) {
+            const banner = document.getElementById('custom-alert-banner');
+            document.getElementById('custom-alert-text').innerText = msg;
+            banner.className = `alert p-3 rounded text-center fw-bold text-white ${colorClass}`;
+            banner.style.display = 'block'; setTimeout(() => { banner.style.display = 'none'; }, 3200);
+        }
+        
+        window.onload = function() {
+            displayTodayLogs();
+            displayArchiveLogs();
+        };
+    </script>
+</body>
+</html>

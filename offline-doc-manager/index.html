@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Records Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f4f6f9;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        }
+        .metrics-card {
+            transition: transform 0.2s;
+            border: none;
+            border-radius: 10px;
+        }
+        .metrics-card:hover {
+            transform: translateY(-3px);
+        }
+        .table-responsive {
+            background: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        th {
+            background-color: #212529 !important;
+            color: #ffffff !important;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+        }
+        .overdue-blink {
+            animation: blinker 1.5s linear infinite;
+        }
+        @keyframes blinker {
+            50% { opacity: 0.3; }
+        }
+        .notification-panel {
+            position: absolute;
+            top: 55px;
+            right: 15px;
+            width: 360px;
+            max-height: 450px;
+            overflow-y: auto;
+            z-index: 1050;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+            border-radius: 8px;
+        }
+        .auto-expand {
+            resize: none;
+            overflow-y: hidden;
+            min-height: 38px;
+        }
+        
+        /* Typing Focus Soft Glow Overlay */
+        .form-control:focus, .form-select:focus {
+            border-color: #198754 !important;
+            box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25) !important;
+        }
+
+        /* Field contains data content */
+        .has-value {
+            border: 2px solid #198754 !important;
+            background-color: #f8fff9 !important;
+        }
+
+        /* Field is blank while editing an existing record */
+        .editing-empty {
+            border: 2px solid #dc3545 !important;
+            background-color: #fff8f8 !important;
+        }
+
+        /* Workspace Tab Styles */
+        .nav-workspace .nav-link {
+            color: #495057;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .nav-workspace .nav-link.active {
+            font-weight: 700;
+            background-color: #212529 !important;
+            color: #fff !important;
+            border-color: #212529 !important;
+        }
+        .toast-container {
+            z-index: 1100;
+        }
+
+        /* CSS Routing Engine (Fixes disappearing nodes) */
+        .view-dashboard #dashboardSection,
+        .view-add-edit #formSection,
+        .view-documents #tableSection,
+        .view-combined #dashboardSection,
+        .view-combined #formSection,
+        .view-combined #tableSection {
+            display: block !important;
+        }
+
+        /* ==========================================================================
+           FULL SCREEN DELETING DATA LOADING SCREEN OVERLAY
+           ========================================================================== */
+        #loadingOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #ffffff;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease-in-out;
+        }
+        #loadingOverlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+    </style>
+</head>
+<body class="view-dashboard" id="workspaceContainer">
+
+    <div id="loadingOverlay">
+        <div class="spinner-border text-danger mb-3" style="width: 3.5rem; height: 3.5rem;" role="status"></div>
+        <h4 class="fw-bold tracking-wide text-uppercase m-0">Wiping Local Database Repositories...</h4>
+        <p class="text-white-50 small mt-1 mb-0">Please do not refresh your browser interface.</p>
+    </div>
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm">
+        <div class="container-fluid">
+            <a class="navbar-brand d-flex align-items-center" href="#">
+                <span class="fs-4 fw-bold tracking-tight text-white">Project Tracker Management</span>
+            </a>
+            
+            <div class="d-flex align-items-center position-relative">
+                <button onclick="toggleNotifications(event)" id="notificationBellBtn" class="btn btn-outline-light btn-sm position-relative me-2">
+                    🔔 Notifications
+                    <span id="notificationCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">0</span>
+                </button>
+                
+                <div id="notificationAlertPanel" class="card notification-panel d-none bg-white">
+                    <div class="card-header bg-dark text-white fw-bold small py-2">
+                        Need to Complete before Awarding Date 
+                    </div>
+                    <div class="card-body p-2">
+                        <ul id="notificationList" class="list-unstyled mb-0 small text-dark">
+                            <li>No urgent timelines found.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="bg-white border-bottom shadow-sm mb-4">
+        <div class="container-fluid">
+            <ul class="nav nav-tabs nav-workspace border-0 pt-2" id="workspaceTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" onclick="switchWorkspace('dashboard')">Dashboard View</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="addEditTabBtn" onclick="switchWorkspace('add-edit')">Add/Edit Project</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" onclick="switchWorkspace('documents')">Recorded Documents</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" onclick="switchWorkspace('combined')">Combined Workspace</button>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="actionFeedbackToast" class="toast align-items-center text-white bg-dark border-0 shadow" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="4000">
+            <div class="d-flex">
+                <div class="toast-body fw-medium" id="toastMessageBody"></div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid my-4">
+        <div class="row g-4">
+            
+            <div id="dashboardSection" class="col-12" style="display: none;">
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="card metrics-card bg-primary text-white shadow-sm">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-1 text-white-50 uppercase font-weight-bold" style="font-size:11px;">Total Documented Projects</h6>
+                                <h2 id="totalDocs" class="card-title mb-0 fw-bold">0</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card metrics-card bg-warning text-dark shadow-sm">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-1 text-black-50 uppercase font-weight-bold" style="font-size:11px;">Pending Operations</h6>
+                                <h2 id="pendingDocs" class="card-title mb-0 fw-bold">0</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card metrics-card bg-success text-white shadow-sm">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-1 text-white-50 uppercase font-weight-bold" style="font-size:11px;">Completed Frameworks</h6>
+                                <h2 id="completedDocs" class="card-title mb-0 fw-bold">0</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card metrics-card bg-danger text-white shadow-sm">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-1 text-white-50 uppercase font-weight-bold" style="font-size:11px;">Active Awarding Triggers</h6>
+                                <h2 id="overdueDocs" class="card-title mb-0 fw-bold">0</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="dashboardTimelineBlock" class="card shadow-sm border-0 bg-white p-4 rounded-3 mb-4">
+                    <h5 class="fw-bold text-dark mb-3">🔔 Timelines To Complete Before Awarding Date</h5>
+                    <hr>
+                    <div class="table-responsive shadow-none border">
+                        <ul id="dashboardNotificationList" class="list-group list-group-flush p-2 small">
+                            <li class="list-group-item text-muted text-center py-3">No urgent timelines found.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div id="formSection" class="col-xl-4 col-lg-5" style="display: none;">
+                <div class="card shadow-sm border-0 rounded-3">
+                    <div id="formHeader" class="card-header bg-dark text-white fw-bold py-3">
+                        Add Project Record
+                    </div>
+                    <div class="card-body bg-white p-3">
+                        <form id="documentForm" onsubmit="event.preventDefault(); saveDocument();">
+                            
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold text-secondary">Name of Project <span class="text-danger">*</span></label>
+                                <textarea id="title" class="form-control auto-expand" rows="1" placeholder="Enter full programmatic title description..."></textarea>
+                            </div>
+
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold text-secondary">Approved Budget for Contract</label>
+                                    <input type="text" id="approvedBudget" class="form-control form-control-sm" placeholder="₱ Value">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold text-secondary">Winning Bidder</label>
+                                    <input type="text" id="winningBidder" class="form-control form-control-sm" placeholder="Company Name">
+                                </div>
+                            </div>
+
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold text-secondary">Bid Amount</label>
+                                    <input type="text" id="bidAmount" class="form-control form-control-sm" placeholder="₱ Final">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold text-secondary">Date of Bidding</label>
+                                    <input type="date" id="biddingDate" class="form-control form-control-sm">
+                                </div>
+                            </div>
+
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold text-secondary">Contract Duration</label>
+                                    <input type="text" id="contractDuration" class="form-control form-control-sm" placeholder="Calendar Days">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold text-secondary">NOA</label>
+                                    <input type="date" id="noa" class="form-control form-control-sm">
+                                </div>
+                            </div>
+
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold text-secondary">Performance Bond</label>
+                                    <input type="date" id="performanceBond" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold text-secondary">Contract</label>
+                                    <input type="date" id="contractRef" class="form-control form-control-sm">
+                                </div>
+                            </div>
+
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold text-secondary">DOLE</label>
+                                    <input type="date" id="dole" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold text-secondary">Contract End Date</label>
+                                    <input type="date" id="contractEndDate" class="form-control form-control-sm">
+                                </div>
+                            </div>
+
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold text-secondary">NTP</label>
+                                    <input type="date" id="ntpDate" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small fw-bold text-secondary">Completion</label>
+                                    <input type="date" id="completionDate" class="form-control form-control-sm">
+                                </div>
+                            </div>
+
+                            <div class="row g-2 mb-3">
+                                <div class="col-4">
+                                    <label class="form-label small fw-bold text-secondary">In / Out Status</label>
+                                    <select id="inOut" class="form-select form-select-sm">
+                                        <option value="">None</option>
+                                        <option value="In">In</option>
+                                        <option value="Out">Out</option>
+                                    </select>
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label small fw-bold text-secondary">Liquidated Damages</label>
+                                    <input type="text" id="liquidatedDamages" class="form-control form-control-sm" placeholder="Parameters">
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label small fw-bold text-secondary">Operational Status</label>
+                                    <select id="status" class="form-select form-select-sm fw-bold bg-light">
+                                        <option value="Pending" class="text-warning fw-bold">Pending</option>
+                                        <option value="Completed" class="text-success fw-bold">Completed</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold text-secondary">Additonal Remarks</label>
+                                <textarea id="remarks" class="form-control auto-expand" rows="1" placeholder="Supplementary log descriptions..."></textarea>
+                            </div>
+
+                            <div class="d-grid gap-2">
+                                <button type="submit" id="saveBtn" class="btn btn-dark btn-sm shadow-sm fw-bold">Save Project</button>
+                                <button type="button" id="cancelEditBtn" onclick="resetFormAccess()" class="btn btn-outline-danger btn-sm d-none">Cancel Edit Mode</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tableSection" class="col-xl-8 col-lg-7" style="display: none;">
+                <div class="card shadow-sm border-0 p-3 mb-3 bg-white rounded-3">
+                    <div class="row g-3 align-items-end mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-dark">Search</label>
+                            <input type="text" id="searchInput" oninput="loadDocuments()" class="form-control form-control-sm" placeholder="Search project name, key sequence, or bidder name...">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-dark">Search By Bidding Date</label>
+                            <input type="date" id="filterBiddingDate" onchange="loadDocuments()" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-dark">Search By NOA Date</label>
+                            <input type="date" id="filterNoaDate" onchange="loadDocuments()" class="form-control form-control-sm">
+                        </div>
+                    </div> <div class="d-flex flex-wrap align-items-center gap-2 pt-2 border-top">
+                        <button onclick="exportToExcel()" class="btn btn-sm btn-success d-flex align-items-center gap-1 fw-bold">
+                            📥 Export Excel
+                        </button>
+
+                        <div class="d-flex align-items-center gap-1 border rounded p-1 bg-light shadow-sm">
+                            <label for="excelImportInput" class="small text-muted px-1 fw-bold mb-0">Import:</label>
+                            <input type="file" id="excelImportInput" accept=".xlsx, .xls" class="form-control form-control-sm py-0" style="max-width: 200px;">
+                            <button onclick="importFromExcel()" class="btn btn-sm btn-primary py-1">
+                                Upload
+                            </button>
+                        </div>
+
+                        <button onclick="triggerPurgeDatabaseWorkflow()" class="btn btn-sm btn-danger ms-sm-auto d-flex align-items-center gap-1 fw-bold">
+                            🗑️ Delete All Records
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-responsive bg-white">
+                    <table class="table table-hover align-middle mb-0 text-dark" style="font-size:13px;">
+                        <thead>
+                            <tr>
+                                <th style="width: 5%;">NO</th>
+                                <th style="width: 32%;">Name of Project</th>
+                                <th style="width: 10%;">Date of Bidding</th>
+                                <th style="width: 10%;">NTP</th>
+                                <th style="width: 10%;">Contract End Date</th>
+                                <th style="width: 15%;">Completion</th>
+                                <th style="width: 5%;">In/Out</th>
+                                <th style="width: 5%;">Status</th> <th style="width: 8%; text-align: center;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="documentTable">
+                            <tr>
+                                <td colspan="9" class="text-center py-4 text-muted">
+                                    <div class="spinner-border spinner-border-sm text-secondary me-2" role="status"></div>
+                                    Bootstrapping localized structure synchronization...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="d-flex flex-sm-row flex-column justify-content-between align-items-center mt-3 p-2 bg-white rounded shadow-sm border small gap-2">
+                    <div id="paginationInfo" class="text-muted">Showing 0-0 of 0 entries</div>
+                    <nav id="paginationControls"></nav>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-md modal-dialog-scrollable modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-dark text-white py-2 px-3">
+                    <h6 class="modal-title fw-bold">Historical Changes Audit Trail Logs</h6>
+                    <button type="button" class="btn-close btn-close-white small" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body bg-light p-3" id="historyBody" style="max-height: 500px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        let db;
+        window.dbReady = false;
+        const request = indexedDB.open("ProjectManagementDB", 3);
+
+        request.onupgradeneeded = function(event) {
+            const databaseInstance = event.target.result;
+            if (!databaseInstance.objectStoreNames.contains("projects")) {
+                databaseInstance.createObjectStore("projects", { keyPath: "id", autoIncrement: true });
+            }
+            if (!databaseInstance.objectStoreNames.contains("history")) {
+                databaseInstance.createObjectStore("history", { keyPath: "id", autoIncrement: true });
+            }
+        };
+
+        request.onsuccess = function(event) {
+            db = event.target.result;
+            window.dbReady = true;
+        };
+
+        request.onerror = function() {
+            console.error("Local IndexedDB browser memory layer extraction aborted unexpectedly.");
+        };
+    </script>
+    <script src="js/documents.js"></script>
+</body>
+</html>
