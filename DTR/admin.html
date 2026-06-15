@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LGU Laoag - Engineering Admin Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        :root { --premium-dark: #0f172a; --accent-red: #be123c; }
+        body { background: #f8fafc; font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; }
+        .premium-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+        .table-responsive { max-height: 520px; overflow-y: auto; border-radius: 8px; }
+        #custom-alert-banner { position: fixed; top: 20px; right: 20px; z-index: 9999; display: none; min-width: 320px; border-radius: 10px; }
+        .admin-badge { background: var(--accent-red); color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px; }
+        .edit-highlight { background-color: #fffbeb !important; border: 1px solid #fef3c7 !important; }
+        
+        /* Unified System Navigation Menu Stylings */
+        .admin-menu-bar { background: #ffffff; border-bottom: 2px solid #e2e8f0; padding: 0 1rem; }
+        .nav-menu-pills .nav-link { color: #64748b; font-weight: 600; border-radius: 0; border-bottom: 3px solid transparent; padding: 1rem 1.25rem; transition: all 0.2s; }
+        .nav-menu-pills .nav-link:hover { color: var(--premium-dark); background: #f8fafc; }
+        .nav-menu-pills .nav-link.active { color: var(--premium-dark) !important; background: transparent !important; border-bottom-color: var(--premium-dark); }
+        .nav-link-external { display: flex; align-items: center; color: #0284c7 !important; font-weight: 700; text-decoration: none; padding: 1rem 1.25rem; }
+        .nav-link-external:hover { background: #f0f9ff; }
+    </style>
+</head>
+<body>
+
+    <header class="bg-dark text-white d-flex justify-content-between align-items-center px-4 py-3 shadow-sm">
+        <div>
+            <h4 class="fw-bold mb-0 d-flex align-items-center gap-2">ADMIN CONTROL HUB</h4>
+            <small class="text-white-50 fw-semibold">LGU-LAOAG - Office of City Engineering </small>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <span class="admin-badge">SYSTEM PRIVILEGED</span>
+            <a href="index.html" class="btn btn-sm btn-danger fw-bold px-3 rounded-3" onclick="sessionStorage.removeItem('admin_authenticated');">Exit Admin Access</a>
+        </div>
+    </header>
+
+    <nav class="admin-menu-bar shadow-sm mb-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap">
+            <ul class="nav nav-menu-pills" id="adminWorkspaceMenu" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link active" id="registry-tab" data-bs-toggle="tab" data-bs-target="#menu-registry" type="button" onclick="resetUserFormMode()">👥 Employee Profile Registry Directory</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="injector-tab" data-bs-toggle="tab" data-bs-target="#menu-injector" type="button">Add/Edit and View Daily-Time-Record</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="combined-tab" data-bs-toggle="tab" data-bs-target="#menu-combined" type="button" onclick="syncCombinedWorkspaceViews()">Combined Workspace</button>
+                </li>
+            </ul>
+            
+            <div class="d-flex border-start">
+                <a href="qr_generator.html" class="nav-link-external gap-1">Open QR-Badge Studio →</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4 pb-5">
+        <div class="tab-content" id="adminMenuTabContent">
+            
+            <div class="tab-pane fade show active" id="menu-registry" role="tabpanel">
+                <div class="row g-4 justify-content-center">
+                    <div class="col-lg-5">
+                        <div class="premium-card p-4">
+                            <h5 id="form-action-title" class="fw-bold text-dark mb-3 border-bottom pb-2">Profile Action Management</h5>
+                            <form id="admin-user-form" class="mb-2">
+                                <input type="hidden" id="editOriginalId" value="">
+                                <div class="mb-3">
+                                    <label class="small fw-bold text-muted mb-1">System ID Assignment Reference</label>
+                                    <input type="text" class="form-control font-monospace" id="regUserId" placeholder="Register New ID (e.g., engr-123456)" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="small fw-bold text-muted mb-1">Full Legal Name</label>
+                                    <input type="text" class="form-control" id="regUserName" placeholder="Surname, First Name M.I." required>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button type="submit" id="submit-user-btn" class="btn btn-primary w-100 fw-bold py-2 rounded-3">Commit Registration Frame</button>
+                                    <button type="button" id="cancel-edit-btn" class="btn btn-outline-secondary w-50 fw-bold rounded-3" style="display:none;" onclick="resetUserFormMode()">Cancel Modification</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="col-lg-7">
+                        <div class="premium-card overflow-hidden">
+                            <div class="p-3 bg-light border-bottom fw-bold text-secondary text-uppercase small">Active Profile Registry Index</div>
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0 text-center">
+                                    <thead class="table-light sticky-top">
+                                        <tr><th>System ID</th><th>Name Description</th><th>Action Control Node</th></tr>
+                                    </thead>
+                                    <tbody id="user-directory-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="menu-injector" role="tabpanel">
+                <div class="row g-4">
+                    <div class="col-xl-4 col-lg-5">
+                        <div class="premium-card p-4 mb-3" style="border-left: 4px solid var(--accent-red);">
+                            <h6 class="fw-bold text-danger mb-1">Import Employee Daily-Time-Record (DTR) Excel File</h6>
+                            <p class="text-muted small mb-3">Parses matrix serialized layout sheets directly, bypassing backend validation engines.</p>
+                            <div class="mb-3">
+                                <input class="form-control form-control-sm" type="file" id="excelFileInput" accept=".xlsx, .xls">
+                            </div>
+                            <button type="button" class="btn btn-danger btn-sm w-100 fw-bold" onclick="processExcelImport()">⚡ Execute Batch Sync Import</button>
+                        </div>
+
+                        <div class="premium-card p-4">
+                            <h6 class="fw-bold text-dark mb-3 border-bottom pb-2">Forced Daily-Time-Record Entry</h6>
+                            <form id="admin-alteration-form">
+                                <div class="mb-2">
+                                    <label class="small fw-bold text-muted">Select Target Roster File</label>
+                                    <select class="form-select form-select-sm fw-bold text-primary" id="modUserSelect" required></select>
+                                </div>
+                                <div class="row g-2 mb-2">
+                                    <div class="col-6">
+                                        <label class="small fw-bold text-muted">Override Date</label>
+                                        <input type="date" class="form-control form-control-sm" id="modDate" required>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="small fw-bold text-muted">Override Clock Time</label>
+                                        <input type="time" class="form-control form-control-sm" id="modTime" step="1" required>
+                                    </div>
+                                </div>
+                                <div class="row g-2 mb-3">
+                                    <div class="col-6">
+                                        <label class="small fw-bold text-muted">Shift Event Boundary</label>
+                                        <select class="form-select form-select-sm" id="modType">
+                                            <option value="AM_IN">AM IN</option><option value="AM_OUT">AM OUT</option>
+                                            <option value="PM_IN">PM IN</option><option value="PM_OUT">PM OUT</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="small fw-bold text-muted">Operational Mode</label>
+                                        <select class="form-select form-select-sm" id="modMode">
+                                            <option value="RTO">RTO (Office)</option><option value="WFH">WFH (Home)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-dark btn-sm w-100 fw-bold">Inject Attendance Record Block</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-8 col-lg-7">
+                        <div class="premium-card overflow-hidden">
+                            <div class="p-3 bg-dark text-white d-flex justify-content-between align-items-center">
+                                <span class="fw-bold small"> Daily-Time-Record Archive</span>
+                                <button class="btn btn-sm btn-outline-warning py-0 fw-bold text-uppercase" style="font-size:0.7rem;" onclick="purgeEntireDatabase()">⚠️ Wipe Records</button>
+                            </div>
+                            
+                            <div class="p-2 bg-light border-bottom">
+                                <div class="row g-1">
+                                    <div class="col-4"><input type="text" class="form-control form-control-sm text-center fw-bold" id="archiveSearchId" placeholder="ID Code Filter" oninput="displayArchiveLogs()"></div>
+                                    <div class="col-4">
+                                        <select class="form-select form-select-sm text-center fw-bold" id="archiveYear" onchange="displayArchiveLogs()">
+                                            <option value="2026" selected>2026</option><option value="2027">2027</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-4">
+                                        <select class="form-select form-select-sm text-center fw-bold" id="archiveMonth" onchange="displayArchiveLogs()">
+                                            <option value="01">Jan</option><option value="02">Feb</option><option value="03">Mar</option><option value="04">Apr</option><option value="05">May</option><option value="06" selected>Jun</option><option value="07">Jul</option><option value="08">Aug</option><option value="09">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover table-striped align-middle mb-0 text-center">
+                                    <thead class="table-light sticky-top">
+                                        <tr><th>Date</th><th>Stamp</th><th>ID Reference</th><th>Shift Frame</th><th>Kill Row</th></tr>
+                                    </thead>
+                                    <tbody id="archive-table-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="menu-combined" role="tabpanel">
+                <div class="row g-3">
+                    <div class="col-xl-4 col-md-6">
+                        <div class="premium-card p-3 shadow-sm h-100">
+                            <h6 id="combo-form-action-title" class="fw-bold text-dark mb-2 border-bottom pb-1 small text-uppercase">👥 Roster Setup Module</h6>
+                            <form id="combo-user-form" class="mb-3">
+                                <input type="hidden" id="comboEditOriginalId" value="">
+                                <div class="mb-2">
+                                    <input type="text" class="form-control form-control-sm font-monospace" id="comboRegUserId" placeholder="Target System ID Code" required>
+                                </div>
+                                <div class="mb-2">
+                                    <input type="text" class="form-control form-control-sm" id="comboRegUserName" placeholder="Target Full Corporate Name" required>
+                                </div>
+                                <div class="d-flex gap-1">
+                                    <button type="submit" id="combo-submit-user-btn" class="btn btn-primary btn-sm w-100 fw-bold">Commit Data Wire</button>
+                                    <button type="button" id="combo-cancel-edit-btn" class="btn btn-outline-secondary btn-sm" style="display:none;" onclick="resetUserFormMode()">✖</button>
+                                </div>
+                            </form>
+                            <div class="table-responsive" style="max-height: 280px;">
+                                <table class="table table-sm align-middle mb-0 text-center border" style="font-size: 0.8rem;">
+                                    <thead class="table-light"><tr><th>ID</th><th>Name</th><th>Edit</th></tr></thead>
+                                    <tbody id="combo-user-directory-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-4 col-md-6">
+                        <div class="premium-card p-3 shadow-sm h-100">
+                            <h6 class="fw-bold text-danger mb-2 small text-uppercase">📥 Matrix Stream Overrides</h6>
+                            <div class="p-2 border rounded bg-light mb-3">
+                                <input class="form-control form-control-sm mb-1.5" type="file" id="comboExcelFileInput" accept=".xlsx, .xls">
+                                <button type="button" class="btn btn-danger btn-sm w-100 fw-bold" style="font-size: 0.75rem;" onclick="processExcelImport(true)">⚡ Batch Import Excel File</button>
+                            </div>
+                            <form id="combo-alteration-form">
+                                <div class="mb-1.5">
+                                    <select class="form-select form-select-sm text-primary fw-bold" id="comboModUserSelect" required></select>
+                                </div>
+                                <div class="row g-1 mb-1.5">
+                                    <div class="col-6"><input type="date" class="form-control form-control-sm" id="comboModDate" required></div>
+                                    <div class="col-6"><input type="time" class="form-control form-control-sm" id="comboModTime" step="1" required></div>
+                                </div>
+                                <div class="row g-1 mb-2">
+                                    <div class="col-6">
+                                        <select class="form-select form-select-sm" id="comboModType">
+                                            <option value="AM_IN">AM IN</option><option value="AM_OUT">AM OUT</option>
+                                            <option value="PM_IN">PM IN</option><option value="PM_OUT">PM OUT</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <select class="form-select form-select-sm" id="comboModMode">
+                                            <option value="RTO">RTO</option><option value="WFH">WFH</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-dark btn-sm w-100 fw-bold" style="font-size: 0.8rem;">Inject Log Stream Row</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-4 col-12">
+                        <div class="premium-card overflow-hidden shadow-sm h-100">
+                            <div class="p-2 bg-dark text-white fw-bold small text-uppercase" style="font-size: 0.75rem;">📊 Synchronized Console Ledger</div>
+                            <div class="p-1 bg-light border-bottom d-flex gap-1">
+                                <input type="text" class="form-control form-control-sm text-center font-monospace fw-bold" id="comboArchiveSearchId" placeholder="Filter Code" oninput="displayArchiveLogs()">
+                                <select class="form-select form-select-sm text-center font-monospace" id="comboArchiveMonth" onchange="displayArchiveLogs()">
+                                    <option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option><option value="06" selected>06</option><option value="07">07</option><option value="08">08</option><option value="09">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option>
+                                </select>
+                            </div>
+                            <div class="table-responsive" style="max-height: 340px;">
+                                <table class="table table-sm table-striped text-center mb-0" style="font-size: 0.75rem;">
+                                    <thead class="table-secondary"><tr><th>Date</th><th>Time Stamp</th><th>ID Ref</th><th>Frame</th></tr></thead>
+                                    <tbody id="combo-archive-table-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="custom-alert-banner" class="alert text-white fw-bold p-3 text-center"><span id="custom-alert-text">Status Terminal Message</span></div>
+
+    <script>
+        // Security Authenticated Tab Router Guard Interceptor Matrix
+        (function checkRouteGuard() {
+            if (sessionStorage.getItem('admin_authenticated') !== 'true') {
+                alert("Access Restricted: Valid administrative privileges required.");
+                window.location.href = 'adminlogin.html';
+            }
+        })();
+
+        // Data Sync Routers that maintain shared UI variables across multiple views
+        function displayRegisteredUsers() {
+            const users = JSON.parse(localStorage.getItem('DTR_USERS')) || [];
+            
+            const directoryBody = document.getElementById('user-directory-body');
+            const comboDirectoryBody = document.getElementById('combo-user-directory-body');
+            const userSelect = document.getElementById('modUserSelect');
+            const comboUserSelect = document.getElementById('comboModUserSelect');
+            
+            if (directoryBody) directoryBody.innerHTML = '';
+            if (comboDirectoryBody) comboDirectoryBody.innerHTML = '';
+            
+            const optFallback = '<option value="" disabled selected>-- Select Targeted Profile --</option>';
+            if (userSelect) userSelect.innerHTML = optFallback;
+            if (comboUserSelect) comboUserSelect.innerHTML = optFallback;
+
+            users.forEach(user => {
+                const optionString = JSON.stringify({ id: user.userId, name: user.userName });
+                
+                if (directoryBody) {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><code class="text-primary fw-bold">${user.userId}</code></td>
+                        <td class="text-start small fw-medium">${user.userName}</td>
+                        <td>
+                            <div class="d-flex gap-1 justify-content-center">
+                                <button class="btn btn-sm btn-outline-dark py-0 px-2" style="font-size:0.7rem;" onclick="triggerEditUserMode('${user.userId}', \`${user.userName}\`)">Edit</button>
+                                <button class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size:0.7rem;" onclick="deleteUserProfile('${user.userId}')">Drop</button>
+                            </div>
+                        </td>
+                    `;
+                    directoryBody.appendChild(tr);
+                }
+
+                if (comboDirectoryBody) {
+                    const trCombo = document.createElement('tr');
+                    trCombo.innerHTML = `
+                        <td><code class="text-primary fw-bold">${user.userId}</code></td>
+                        <td class="text-start text-truncate" style="max-width:110px; font-size:0.75rem;">${user.userName}</td>
+                        <td><button class="btn btn-sm btn-link text-warning p-0 border-0 fw-bold" onclick="triggerEditUserMode('${user.userId}', \`${user.userName}\`)">⚙️</button></td>
+                    `;
+                    comboDirectoryBody.appendChild(trCombo);
+                }
+
+                if (userSelect) userSelect.appendChild(new Option(`${user.userId} - ${user.userName}`, optionString));
+                if (comboUserSelect) comboUserSelect.appendChild(new Option(`${user.userId} - ${user.userName}`, optionString));
+            });
+        }
+
+        function triggerEditUserMode(userId, userName) {
+            document.getElementById('form-action-title').innerHTML = `📝 Modifying Profile Workspace: <code class="text-danger">${userId}</code>`;
+            document.getElementById('editOriginalId').value = userId;
+            document.getElementById('regUserId').value = userId;
+            document.getElementById('regUserName').value = userName;
+            document.getElementById('regUserId').classList.add('edit-highlight');
+            document.getElementById('regUserName').classList.add('edit-highlight');
+            document.getElementById('submit-user-btn').innerText = "Apply Cascading Updates";
+            document.getElementById('submit-user-btn').className = "btn btn-warning btn-sm w-100 fw-bold rounded-2";
+            document.getElementById('cancel-edit-btn').style.display = "inline-block";
+
+            document.getElementById('combo-form-action-title').innerHTML = `📝 Edit: <code class="text-danger">${userId}</code>`;
+            document.getElementById('comboEditOriginalId').value = userId;
+            document.getElementById('comboRegUserId').value = userId;
+            document.getElementById('comboRegUserName').value = userName;
+            document.getElementById('comboRegUserId').classList.add('edit-highlight');
+            document.getElementById('comboRegUserName').classList.add('edit-highlight');
+            document.getElementById('combo-submit-user-btn').innerText = "Apply Updates";
+            document.getElementById('combo-submit-user-btn').className = "btn btn-warning btn-sm w-100 fw-bold";
+            document.getElementById('combo-cancel-edit-btn').style.display = "inline-block";
+        }
+
+        function resetUserFormMode() {
+            const formIds = ['', 'combo'];
+            formIds.forEach(prefix => {
+                const title = document.getElementById(prefix ? 'combo-form-action-title' : 'form-action-title');
+                if (title) title.innerHTML = prefix ? `👥 Roster Setup Module` : `👥 Employee Profile Registry Directory`;
+                
+                const orig = document.getElementById(prefix ? 'comboEditOriginalId' : 'editOriginalId');
+                if (orig) orig.value = "";
+                
+                const idInp = document.getElementById(prefix ? 'comboRegUserId' : 'regUserId');
+                if (idInp) { idInp.value = ""; idInp.classList.remove('edit-highlight'); }
+                
+                const nameInp = document.getElementById(prefix ? 'comboRegUserName' : 'regUserName');
+                if (nameInp) { nameInp.value = ""; nameInp.classList.remove('edit-highlight'); }
+                
+                const sBtn = document.getElementById(prefix ? 'combo-submit-user-btn' : 'submit-user-btn');
+                if (sBtn) {
+                    sBtn.innerText = prefix ? "Commit Data Wire" : "Commit Registration Frame";
+                    sBtn.className = prefix ? "btn btn-primary btn-sm w-100 fw-bold" : "btn btn-primary btn-sm w-100 fw-bold rounded-2";
+                }
+                
+                const cBtn = document.getElementById(prefix ? 'combo-cancel-edit-btn' : 'cancel-edit-btn');
+                if (cBtn) cBtn.style.display = "none";
+            });
+        }
+
+        function handleUnifiedUserSubmit(targetIdInput, targetNameInput, sourceOriginalId) {
+            const inputId = targetIdInput.value.trim().toUpperCase();
+            const inputName = targetNameInput.value.trim();
+            
+            let users = JSON.parse(localStorage.getItem('DTR_USERS')) || [];
+            let logs = JSON.parse(localStorage.getItem('DTR_LOGS')) || [];
+
+            if (sourceOriginalId) {
+                if (inputId !== sourceOriginalId && users.some(u => u.userId === inputId)) {
+                    showToastBanner("Validation Blocked: Identity index code collision.", "bg-danger");
+                    return;
+                }
+                users = users.map(u => u.userId === sourceOriginalId ? { userId: inputId, userName: inputName } : u);
+                localStorage.setItem('DTR_USERS', JSON.stringify(users));
+
+                let affectedLogsCount = 0;
+                logs = logs.map(log => {
+                    if (log.userId.toUpperCase() === sourceOriginalId.toUpperCase()) {
+                        affectedLogsCount++;
+                        return { ...log, userId: inputId, userName: inputName };
+                    }
+                    return log;
+                });
+                localStorage.setItem('DTR_LOGS', JSON.stringify(logs));
+                showToastBanner(`⚡ Cascaded Change Successful! Altered ${affectedLogsCount} ledger entries.`, "bg-success");
+                resetUserFormMode();
+            } else {
+                if (users.some(u => u.userId === inputId)) {
+                    showToastBanner("Validation Blocked: Identity index already registered.", "bg-warning text-dark");
+                    return;
+                }
+                users.push({ userId: inputId, userName: inputName });
+                localStorage.setItem('DTR_USERS', JSON.stringify(users));
+                showToastBanner(`Added identity pathing file for: ${inputName}`, "bg-success");
+                targetIdInput.value = ''; targetNameInput.value = '';
+            }
+            displayRegisteredUsers();
+            displayArchiveLogs();
+        }
+
+        document.getElementById('admin-user-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            handleUnifiedUserSubmit(document.getElementById('regUserId'), document.getElementById('regUserName'), document.getElementById('editOriginalId').value);
+        });
+
+        document.getElementById('combo-user-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            handleUnifiedUserSubmit(document.getElementById('comboRegUserId'), document.getElementById('comboRegUserName'), document.getElementById('comboEditOriginalId').value);
+        });
+
+        function executeForcedRowInjection(userSelectId, dateId, timeId, typeId, modeId) {
+            const selectValue = document.getElementById(userSelectId).value;
+            if (!selectValue) return;
+            
+            const profileData = JSON.parse(selectValue);
+            let logs = JSON.parse(localStorage.getItem('DTR_LOGS')) || [];
+            let tInput = document.getElementById(timeId).value;
+            if(tInput.split(':').length === 2) tInput += ":00";
+
+            const tempDate = new Date(`2000-01-01T${tInput}`);
+            let hours = tempDate.getHours();
+            const minutes = String(tempDate.getMinutes()).padStart(2, '0');
+            const seconds = String(tempDate.getSeconds()).padStart(2, '0');
+            const period = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12 || 12;
+
+            logs.push({
+                id: Date.now(), userId: profileData.id, userName: profileData.name,
+                date: document.getElementById(dateId).value,
+                time: `${hours}:${minutes}:${seconds} ${period}`,
+                type: document.getElementById(typeId).value, mode: document.getElementById(modeId).value
+            });
+            localStorage.setItem('DTR_LOGS', JSON.stringify(logs));
+            showToastBanner("Manual Event Stamp Row Injected Successfully.", "bg-success");
+            displayArchiveLogs();
+        }
+
+        document.getElementById('admin-alteration-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            executeForcedRowInjection('modUserSelect', 'modDate', 'modTime', 'modType', 'modMode');
+        });
+
+        document.getElementById('combo-alteration-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            executeForcedRowInjection('comboModUserSelect', 'comboModDate', 'comboModTime', 'comboModType', 'comboModMode');
+        });
+
+        function displayArchiveLogs() {
+            const logs = JSON.parse(localStorage.getItem('DTR_LOGS')) || [];
+            const activeTabElement = document.querySelector('#adminWorkspaceMenu button.active');
+            const activeTab = activeTabElement ? activeTabElement.id : 'registry-tab';
+            const prefix = activeTab === 'combined-tab' ? 'combo' : '';
+            
+            const tbody = document.getElementById(prefix ? 'combo-archive-table-body' : 'archive-table-body');
+            if (!tbody) return;
+
+            const filterId = document.getElementById(prefix ? 'comboArchiveSearchId' : 'archiveSearchId').value.trim().toUpperCase();
+            const yearTarget = document.getElementById(prefix ? 'archiveYear' : 'archiveYear')?.value || "2026";
+            const monthTarget = document.getElementById(prefix ? 'comboArchiveMonth' : 'archiveMonth').value;
+            
+            tbody.innerHTML = '';
+            
+            const targetLogs = logs.filter(log => {
+                const parts = log.date.split('-');
+                return (filterId ? log.userId.toUpperCase() === filterId : true) && parts[0] == yearTarget && parts[1] === monthTarget;
+            });
+
+            targetLogs.sort((a,b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time)).forEach(log => {
+                const tr = document.createElement('tr');
+                if (prefix === 'combo') {
+                    tr.innerHTML = `
+                        <td style="font-size:0.7rem;">${log.date.substring(5)}</td>
+                        <td class="fw-bold text-primary">${log.time.substring(0,5)} ${log.time.slice(-2)}</td>
+                        <td><code>${log.userId}</code></td>
+                        <td><span class="badge bg-dark" style="font-size:0.65rem;">${log.type}</span></td>
+                    `;
+                } else {
+                    tr.innerHTML = `
+                        <td class="small font-monospace">${log.date}</td>
+                        <td class="small font-monospace text-primary fw-bold">${log.time}</td>
+                        <td><span class="badge bg-secondary font-monospace">${log.userId}</span></td>
+                        <td><span class="badge bg-dark font-monospace">${log.type}</span></td>
+                        <td><button class="btn btn-sm btn-link text-danger p-0 m-0 border-0 fw-bold text-decoration-none" onclick="deleteTargetRow(${log.id})">✖</button></td>
+                    `;
+                }
+                tbody.appendChild(tr);
+            });
+        }
+
+        function syncCombinedWorkspaceViews() {
+            document.getElementById('comboArchiveSearchId').value = document.getElementById('archiveSearchId').value;
+            document.getElementById('comboArchiveMonth').value = document.getElementById('archiveMonth').value;
+            displayArchiveLogs();
+        }
+
+        function processExcelImport(isFromCombo = false) {
+            const fileInput = document.getElementById(isFromCombo ? 'comboExcelFileInput' : 'excelFileInput');
+            if (!fileInput.files || fileInput.files.length === 0) {
+                showToastBanner("Import Request Aborted: Choose a file source ledger.", "bg-warning text-dark");
+                return;
+            }
+            
+            const fileReader = new FileReader();
+            fileReader.onload = function(e) {
+                try {
+                    const workbook = XLSX.read(e.target.result, { type: 'array', raw: true });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    
+                    if (rawRows.length < 5) {
+                        showToastBanner("Structure Processing Error: File size boundary profile too low.", "bg-danger");
+                        return;
+                    }
+
+                    let importedUserId = "", importedUserName = "";
+                    let importedYear = "2026", importedMonthNum = "06";
+
+                    for(let r=0; r < Math.min(rawRows.length, 10); r++) {
+                        const lineStr = String(rawRows[r]?.[0] || "");
+                        if (lineStr.includes("Employee:")) {
+                            const idMatch = lineStr.match(/\(([^)]+)\)/);
+                            if (idMatch) importedUserId = idMatch[1].trim().toUpperCase();
+                            const nameMatch = lineStr.match(/Employee:\s*([^(]+)/);
+                            if (nameMatch) importedUserName = nameMatch[1].trim();
+                        }
+                        if (lineStr.includes("DAILY TIME RECORD") || lineStr.includes("BACKUP")) {
+                            const monthsMap = {
+                                "JANUARY":"01","FEBRUARY":"02","MARCH":"03","APRIL":"04","MAY":"05","JUNE":"06",
+                                "JULY":"07","AUGUST":"08","SEPTEMBER":"09","OCTOBER":"10","NOVEMBER":"11","DECEMBER":"12"
+                            };
+                            Object.keys(monthsMap).forEach(mName => {
+                                if (lineStr.toUpperCase().includes(mName)) importedMonthNum = monthsMap[mName];
+                            });
+                            const yearMatch = lineStr.match(/\b(20\d{2})\b/);
+                            if (yearMatch) importedYear = yearMatch[1];
+                        }
+                    }
+
+                    if (!importedUserId) {
+                        showToastBanner("Parsing Failure: Could not isolate employee system parameters.", "bg-danger");
+                        return;
+                    }
+
+                    let currentUsers = JSON.parse(localStorage.getItem('DTR_USERS')) || [];
+                    if (!currentUsers.some(u => u.userId === importedUserId)) {
+                        currentUsers.push({ userId: importedUserId, userName: importedUserName || "Imported Registration profile" });
+                        localStorage.setItem('DTR_USERS', JSON.stringify(currentUsers));
+                    }
+
+                    let parsedLogs = [];
+                    function formatTo12HourTime(cellValue) {
+                        if (cellValue === undefined || cellValue === null) return null;
+                        let cleanedVal = String(cellValue).trim();
+                        if (cleanedVal === "") return null;
+
+                        let hours = 0, minutes = 0, seconds = 0;
+                        let numVal = parseFloat(cleanedVal);
+
+                        if (!isNaN(numVal) && numVal >= 0 && numVal <= 1) {
+                            const totalSeconds = Math.round(numVal * 86400);
+                            hours = Math.floor(totalSeconds / 3600);
+                            minutes = Math.floor((totalSeconds % 3600) / 60);
+                            seconds = totalSeconds % 60;
+                        } else {
+                            let strTime = cleanedVal.toUpperCase();
+                            const isPM = strTime.includes("PM");
+                            const isAM = strTime.includes("AM");
+                            strTime = strTime.replace(/[^\d:]/g, '');
+                            const parts = strTime.split(':');
+                            if (parts.length >= 2) {
+                                hours = parseInt(parts[0], 10);
+                                minutes = parseInt(parts[1], 10);
+                                seconds = parts[2] ? parseInt(parts[2], 10) : 0;
+                                if (isPM && hours < 12) hours += 12;
+                                if (isAM && hours === 12) hours = 0;
+                            } else return null;
+                        }
+
+                        const period = hours >= 12 ? 'PM' : 'AM';
+                        hours = hours % 12 || 12;
+                        return `${hours}:${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')} ${period}`;
+                    }
+
+                    for (let i = 5; i < rawRows.length; i++) {
+                        const row = rawRows[i];
+                        if (!row || !row[0] || isNaN(parseInt(row[0]))) continue;
+
+                        const dayString = String(row[0]).padStart(2, '0');
+                        const targetDate = `${importedYear}-${importedMonthNum}-${dayString}`;
+                        const dutyMode = row[6] ? String(row[6]).trim().toUpperCase() : "RTO";
+
+                        const mapping = [
+                            { val: row[1], type: "AM_IN" }, { val: row[2], type: "AM_OUT" },
+                            { val: row[4], type: "PM_IN" }, { val: row[5], type: "PM_OUT" }
+                        ];
+
+                        mapping.forEach(shift => {
+                            const validTime = formatTo12HourTime(shift.val);
+                            if (validTime) {
+                                parsedLogs.push({
+                                    userId: importedUserId, userName: importedUserName,
+                                    date: targetDate, time: validTime, type: shift.type, mode: dutyMode
+                                });
+                            }
+                        });
+                    }
+
+                    let currentLogs = JSON.parse(localStorage.getItem('DTR_LOGS')) || [];
+                    currentLogs = currentLogs.filter(log => !(log.userId.toUpperCase() === importedUserId && log.date.startsWith(`${importedYear}-${importedMonthNum}`)));
+                    
+                    parsedLogs.forEach((l, index) => {
+                        currentLogs.push({ id: Date.now() + index + Math.floor(Math.random()*100), ...l });
+                    });
+
+                    localStorage.setItem('DTR_LOGS', JSON.stringify(currentLogs));
+                    showToastBanner(`✅ Import Success: Injected ${parsedLogs.length} logs structural files safely.`, "bg-success");
+                    displayRegisteredUsers(); displayArchiveLogs();
+                    fileInput.value = '';
+                } catch (err) {
+                    console.error(err);
+                    showToastBanner("System Internal Struct Exception: Processing corrupted mapping layout.", "bg-danger");
+                }
+            };
+            fileReader.readAsArrayBuffer(fileInput.files[0]);
+        }
+
+        function deleteTargetRow(targetId) {
+            let logs = JSON.parse(localStorage.getItem('DTR_LOGS')) || [];
+            logs = logs.filter(item => item.id !== targetId);
+            localStorage.setItem('DTR_LOGS', JSON.stringify(logs));
+            showToastBanner("Timestamp removed.", "bg-dark text-warning");
+            displayArchiveLogs();
+        }
+
+        function deleteUserProfile(targetUserId) {
+            if (confirm("⚠️ Remove profile data file? Structural backup script triggers naturally.")) {
+                let users = JSON.parse(localStorage.getItem('DTR_USERS')) || [];
+                users = users.filter(u => u.userId !== targetUserId);
+                localStorage.setItem('DTR_USERS', JSON.stringify(users));
+                displayRegisteredUsers();
+            }
+        }
+
+        function purgeEntireDatabase() {
+            if(confirm("🚨 Database Purge Requested. Proceed?")) {
+                localStorage.removeItem('DTR_LOGS');
+                showToastBanner("Activity database tables successfully initialized & cleared.", "bg-danger text-white");
+                displayArchiveLogs();
+            }
+        }
+
+        function showToastBanner(msg, colorClass) {
+            const banner = document.getElementById('custom-alert-banner');
+            document.getElementById('custom-alert-text').innerText = msg;
+            banner.className = `alert p-3 text-center fw-bold text-white ${colorClass}`;
+            banner.style.display = 'block'; setTimeout(() => { banner.style.display = 'none'; }, 3000);
+        }
+
+        window.onload = function() { displayRegisteredUsers(); displayArchiveLogs(); };
+    </script>
+</body>
+</html>

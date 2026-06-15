@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LGU Laoag - Profile QR-Badge Generator Studio</title>
+    
+    <!-- Bootstrap 5 CSS Framework -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- QRCode.js Generation Engine Library Component -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <style>
+        :root { 
+            --lgu-navy: #0b192c; 
+            --lgu-blue-mid: #1e3e62;
+            --lgu-accent-red: #b8001f; 
+            --lgu-gold: #e6b325;
+            --text-dark: #111827;
+        }
+        body { background: #f1f5f9; font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; }
+        .premium-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 4px 20px rgba(15,23,42,0.05); }
+        .table-responsive { max-height: 520px; overflow-y: auto; border-radius: 10px; }
+        
+        /* COMPACT SPECIFICATION LAYOUT */
+        .id-badge-layout {
+            width: 260px;
+            height: 380px;
+            background: #ffffff !important;
+            border: 1px solid #94a3b8;
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 25px rgba(11, 25, 44, 0.1);
+            position: relative;
+            margin: 0 auto;
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        /* Subtle Secure Guilloche Overlay Effect Pattern simulation */
+        .id-badge-layout::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(var(--lgu-blue-mid) 0.5px, transparent 0.5px), radial-gradient(var(--lgu-blue-mid) 0.5px, #ffffff 0.5px);
+            background-size: 16px 16px;
+            background-position: 0 0, 8px 8px;
+            opacity: 0.025;
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        /* Header Block Design */
+        .id-badge-header {
+            background: linear-gradient(135deg, var(--lgu-navy) 0%, var(--lgu-blue-mid) 100%) !important;
+            color: #ffffff !important;
+            padding: 12px 10px 10px 10px;
+            text-align: center;
+            border-bottom: 3px solid var(--lgu-accent-red) !important;
+            position: relative;
+            z-index: 2;
+            flex-shrink: 0;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .id-badge-header h6 {
+            color: var(--lgu-gold) !important;
+            font-size: 1.05rem;
+            letter-spacing: 1px;
+            margin-bottom: 1px;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        .id-badge-header .dept-lbl {
+            font-size: 0.62rem;
+            opacity: 0.9;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: #ffffff !important;
+        }
+        
+        /* Central Body Context Area */
+        .id-badge-body {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            background: radial-gradient(circle at center, #ffffff 50%, #f8fafc 100%) !important;
+            position: relative;
+            z-index: 2;
+            overflow: hidden;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        /* High Visibility Security Ribbon Bar */
+        .security-ribbon {
+            background: var(--lgu-accent-red) !important;
+            color: #ffffff !important;
+            font-size: 0.55rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 3px 16px;
+            border-radius: 50px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 4px rgba(184, 0, 31, 0.15);
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        
+        /* Compact QR Frame Structure */
+        .qr-canvas-holder {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 125px;
+            height: 125px;
+            margin: 0 auto;
+            background: #ffffff !important;
+            border: 2px solid var(--lgu-navy) !important;
+            border-radius: 10px;
+            padding: 6px;
+            box-sizing: border-box;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .qr-canvas-holder img, .qr-canvas-holder canvas { 
+            max-width: 100% !important;
+            max-height: 100% !important;
+            display: block !important;
+        }
+        .qr-canvas-holder canvas + img { display: none !important; }
+        
+        /* Footer Structural Element base */
+        .id-badge-footer {
+            background: #f8fafc !important;
+            border-top: 1px solid #e2e8f0;
+            padding: 10px 10px 14px 10px;
+            text-align: center;
+            position: relative;
+            z-index: 2;
+            flex-shrink: 0;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        .id-badge-footer h5 {
+            color: var(--text-dark) !important;
+            font-size: 1.05rem;
+            font-weight: 800;
+            letter-spacing: -0.2px;
+            margin-bottom: 4px;
+        }
+        .id-badge-footer .sys-id-lbl {
+            font-family: 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+            color: var(--lgu-blue-mid) !important;
+            font-weight: 700;
+            font-size: 0.8rem;
+            letter-spacing: 0.3px;
+            background: #e0f2fe !important;
+            display: inline-block;
+            padding: 1px 8px;
+            border-radius: 4px;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .batch-indicator-bar {
+            background: #e0f2fe;
+            border: 1px solid #bae6fd;
+            border-radius: 12px;
+            padding: 14px 20px;
+        }
+
+        #print-capture-matrix-deck { display: none; }
+
+        /* ADVANCED HARDWARE PRINT SHEET ENGINE TUNING PARAMS */
+        @page {
+            size: letter;
+            margin: 0.4in;
+        }
+
+        @media print {
+            body { 
+                background: #ffffff !important; 
+                color: #000000 !important;
+            }
+            
+            #main-app-interface { 
+                display: none !important; 
+            }
+            
+            #print-capture-matrix-deck {
+                display: flex !important;
+                flex-wrap: wrap !important;
+                flex-direction: row !important;
+                justify-content: flex-start !important;
+                gap: 20px;
+                padding: 0 !important;
+                width: 100% !important;
+                background: #ffffff !important;
+            }
+            
+            .print-badge-wrapper {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                display: block !important;
+                width: 260px;
+                height: 380px;
+            }
+            
+            .id-badge-layout { 
+                box-shadow: none !important; 
+                border: 1px solid #000000 !important;
+                display: flex !important;
+                margin: 0 !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="main-app-interface">
+        <header class="bg-dark text-white d-flex justify-content-between align-items-center px-4 py-3 shadow-sm mb-4">
+            <div>
+                <h4 class="fw-bold mb-0 d-flex align-items-center gap-2">PROFILE QR-BADGE GENERATOR STUDIO</h4>
+                <small class="text-white-50 fw-semibold">LGU-LAOAG - Office of City Engineering </small>
+            </div>
+            <div>
+                <a href="admin.html" class="btn btn-sm btn-outline-light fw-bold px-3 rounded-3">← Return to Control Console</a>
+            </div>
+        </header>
+
+        <div class="container-fluid px-4 pb-5">
+            <div class="row g-4">
+                
+                <!-- LEFT PANEL: DIRECTORY -->
+                <div class="col-xl-7 col-lg-6">
+                    <div class="premium-card p-4 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="fw-bold text-dark mb-0">Personnel Directory Registry Index</h5>
+                            <button class="btn btn-sm btn-outline-secondary fw-bold" onclick="toggleSelectAllRows(this)" id="globalSelectAllBtn">Select All</button>
+                        </div>
+
+                        <div class="batch-indicator-bar d-flex justify-content-between align-items-center mb-3">
+                            <div class="small text-dark fw-medium">
+                                <span class="fw-bold text-primary fs-5" id="selected-count-badge">0</span> profiles checked for printing sequence
+                            </div>
+                            <button class="btn btn-primary btn-sm fw-bold shadow-sm px-3" id="bulkDownloadBtn" onclick="triggerBulkDownloadSequence()" disabled>
+                                📥 Download Selected (.PNG)
+                            </button>
+                        </div>
+
+                        <div class="table-responsive border">
+                            <table class="table table-hover align-middle mb-0 text-center">
+                                <thead class="table-light sticky-top">
+                                    <tr>
+                                        <th width="60">Select</th>
+                                        <th>System ID Reference</th>
+                                        <th class="text-start">Employee Profile Name</th>
+                                        <th>Action Node</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="personnel-directory-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RIGHT PANEL: PREMIUM MOCK PREVIEW DECK -->
+                <div class="col-xl-5 col-lg-6">
+                    <div class="premium-card p-4 text-center sticky-top" style="top: 24px;">
+                        <h5 class="fw-bold text-dark text-start mb-3 pb-2 border-bottom">Preview Layout of QR-Badge ID</h5>
+                        
+                        <div class="py-4 bg-light rounded-3 mb-4 border border-dashed">
+                            
+                            <!-- PREMIUM LAYOUT MOCKUP DECK TARGET -->
+                            <div class="id-badge-layout" id="live-render-badge-frame">
+                                <div class="id-badge-header">
+                                    <h6 class="fw-bold text-uppercase">LGU - LAOAG</h6>
+                                    <div class="dept-lbl">Office of City Engineering</div>
+                                </div>
+                                
+                                <div class="id-badge-body">
+                                    <div class="security-ribbon">OFFICIAL AUTHORIZED ID</div>
+                                    <div id="qrcode-canvas-target" class="qr-canvas-holder"></div>
+                                </div>
+                                
+                                <div class="id-badge-footer">
+                                    <h5 class="fw-bold text-truncate" id="preview-full-name">---</h5>
+                                    <div class="sys-id-lbl" id="preview-user-id">-- PLACEHOLDER --</div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <div class="d-flex gap-2 justify-content-center">
+                            <button id="action-download-btn" class="btn btn-outline-dark fw-bold rounded-3 w-100" onclick="downloadSingleActivePreviewBadge()" disabled>
+                                💾 Save Single Badge (.PNG)
+                            </button>
+                            <button class="btn btn-danger fw-bold rounded-3 w-100 shadow-sm" onclick="executePrintPipelineSequence()">
+                                🖨️ Print Selected Badges
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- CLEAN MULTI-COLUMN CONTEXT GRID LAYOUT RETUNED FOR HARWARE INTERFACES -->
+    <div id="print-capture-matrix-deck"></div>
+
+    <script>
+        let activeTargetId = "";
+        let activeTargetName = "";
+
+        function mountPersonnelDirectory() {
+            const users = JSON.parse(localStorage.getItem('DTR_USERS')) || [];
+            const tbody = document.getElementById('personnel-directory-body');
+            tbody.innerHTML = '';
+
+            if (users.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="text-muted p-4 small">No active profile logs discovered in storage structures.</td></tr>`;
+                return;
+            }
+
+            users.forEach((user) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <input type="checkbox" class="form-check-input row-batch-checkbox" value="${user.userId}" data-name="${user.userName}">
+                    </td>
+                    <td><code class="text-primary fw-bold font-monospace fs-6">${user.userId}</code></td>
+                    <td class="text-start small fw-bold text-secondary">${user.userName}</td>
+                    <td>
+                        <button class="btn btn-sm btn-dark py-1 px-3 rounded-2 fw-semibold" style="font-size: 0.75rem;" onclick="stageIdentityIntoPreview('${user.userId}', \`${user.userName}\`)">
+                            View Badge
+                        </button>
+                    </td>
+                `;
+                tr.querySelector('.row-batch-checkbox').addEventListener('change', evaluateCheckedQueueState);
+                tbody.appendChild(tr);
+            });
+
+            if (users.length > 0) {
+                stageIdentityIntoPreview(users[0].userId, users[0].userName);
+            }
+        }
+
+        function stageIdentityIntoPreview(userId, userName) {
+            activeTargetId = userId;
+            activeTargetName = userName;
+
+            document.getElementById('preview-full-name').innerText = userName;
+            document.getElementById('preview-user-id').innerText = userId;
+
+            const qrContainer = document.getElementById('qrcode-canvas-target');
+            qrContainer.innerHTML = ''; 
+
+            new QRCode(qrContainer, {
+                text: userId,
+                width: 105,
+                height: 105,
+                colorDark : "#0b192c",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+
+            document.getElementById('action-download-btn').disabled = false;
+        }
+
+        function evaluateCheckedQueueState() {
+            const checkBoxes = document.querySelectorAll('.row-batch-checkbox');
+            let selectedCount = 0;
+
+            checkBoxes.forEach(cb => { if(cb.checked) selectedCount++; });
+
+            document.getElementById('selected-count-badge').innerText = selectedCount;
+            document.getElementById('bulkDownloadBtn').disabled = (selectedCount === 0);
+            
+            const allBtn = document.getElementById('globalSelectAllBtn');
+            if (selectedCount === checkBoxes.length && checkBoxes.length > 0) {
+                allBtn.innerText = "Deselect All";
+                allBtn.className = "btn btn-sm btn-secondary fw-bold";
+            } else {
+                allBtn.innerText = "Select All";
+                allBtn.className = "btn btn-sm btn-outline-secondary fw-bold";
+            }
+        }
+
+        function toggleSelectAllRows(btnTrigger) {
+            const checkBoxes = document.querySelectorAll('.row-batch-checkbox');
+            const state = btnTrigger.innerText === "Select All";
+
+            checkBoxes.forEach(cb => cb.checked = state);
+            evaluateCheckedQueueState();
+        }
+
+        function executePrintPipelineSequence() {
+            const checkBoxes = document.querySelectorAll('.row-batch-checkbox');
+            const selectedItems = Array.from(checkBoxes).filter(cb => cb.checked);
+
+            if (selectedItems.length === 0) {
+                alert("Please check at least one employee row from the dashboard to initialize printing processes.");
+                return;
+            }
+
+            const printDeck = document.getElementById('print-capture-matrix-deck');
+            printDeck.innerHTML = ''; 
+
+            selectedItems.forEach((cb, idx) => {
+                const uId = cb.value;
+                const uName = cb.getAttribute('data-name');
+
+                const wrapperNode = document.createElement('div');
+                wrapperNode.className = "print-badge-wrapper";
+                wrapperNode.innerHTML = `
+                    <div class="id-badge-layout">
+                        <div class="id-badge-header">
+                            <h6 class="fw-bold text-uppercase">LGU - LAOAG</h6>
+                            <div class="dept-lbl">Office of City Engineering</div>
+                        </div>
+                        <div class="id-badge-body">
+                            <div class="security-ribbon">OFFICIAL AUTHORIZED ID</div>
+                            <div id="bulk-qr-target-${idx}" class="qr-canvas-holder"></div>
+                        </div>
+                        <div class="id-badge-footer">
+                            <h5 class="fw-bold text-truncate">${uName}</h5>
+                            <div class="sys-id-lbl">${uId}</div>
+                        </div>
+                    </div>
+                `;
+                printDeck.appendChild(wrapperNode);
+
+                new QRCode(document.getElementById(`bulk-qr-target-${idx}`), {
+                    text: uId, 
+                    width: 105, 
+                    height: 105,
+                    colorDark : "#000000", 
+                    colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.H
+                });
+            });
+
+            setTimeout(() => { window.print(); }, 400);
+        }
+
+        function downloadSingleActivePreviewBadge() {
+            if (!activeTargetId) return;
+
+            const qrCanvas = document.querySelector('#qrcode-canvas-target canvas');
+            let qrSourceUrl = qrCanvas ? qrCanvas.toDataURL("image/png") : "";
+
+            if (!qrSourceUrl) {
+                const qrImg = document.querySelector('#qrcode-canvas-target img');
+                if (qrImg && qrImg.src) qrSourceUrl = qrImg.src;
+            }
+
+            if (!qrSourceUrl) {
+                alert("Exception rendering canvas source data targets.");
+                return;
+            }
+
+            executeFileDownloadPipeline(qrSourceUrl, `COMPACT_ID_${activeTargetId}.png`);
+        }
+
+        function triggerBulkDownloadSequence() {
+            const checkBoxes = document.querySelectorAll('.row-batch-checkbox');
+            const selectedBoxes = Array.from(checkBoxes).filter(cb => cb.checked);
+            
+            const hiddenRenderBox = document.createElement('div');
+            hiddenRenderBox.style.position = 'absolute';
+            hiddenRenderBox.style.left = '-9999px';
+            document.body.appendChild(hiddenRenderBox);
+
+            let processedCounter = 0;
+
+            selectedBoxes.forEach((cb, idx) => {
+                processedCounter++;
+                const targetUserId = cb.value;
+                
+                const tempDiv = document.createElement('div');
+                hiddenRenderBox.appendChild(tempDiv);
+
+                new QRCode(tempDiv, {
+                    text: targetUserId, width: 105, height: 105,
+                    colorDark : "#000000", colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.H
+                });
+                
+                setTimeout(() => {
+                    const canvasElement = tempDiv.querySelector('canvas');
+                    let srcData = canvasElement ? canvasElement.toDataURL("image/png") : "";
+
+                    if (!srcData) {
+                        const imgElement = tempDiv.querySelector('img');
+                        if (imgElement && imgElement.src) srcData = imgElement.src;
+                    }
+
+                    if (srcData) {
+                        executeFileDownloadPipeline(srcData, `COMPACT_ID_${targetUserId}.png`);
+                    }
+
+                    if (processedCounter === selectedBoxes.length) {
+                        document.body.removeChild(hiddenRenderBox);
+                    }
+                }, processedCounter * 350);
+            });
+        }
+
+        function executeFileDownloadPipeline(base64StreamData, fileNameTarget) {
+            const hook = document.createElement('a');
+            hook.href = base64StreamData;
+            hook.download = fileNameTarget;
+            document.body.appendChild(hook);
+            hook.click();
+            document.body.removeChild(hook);
+        }
+
+        window.onload = function() { mountPersonnelDirectory(); };
+    </script>
+</body>
+</html>
